@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CYPHER · SCANNER SANDBOX</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Syne:wght@400;500;600;700;800&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #080a0d;
+  --bg1:      #0d1117;
+  --bg2:      #111820;
+  --bg3:      #182030;
+  --border:   rgba(255,255,255,0.07);
+  --border2:  rgba(255,255,255,0.12);
+  --text1:    #f0f4ff;
+  --text2:    #8b9cb8;
+  --text3:    #4a5568;
+  --accent:   #3d7fff;
+  --gain:     #19d48a;
+  --loss:     #ff4d6a;
+  --warn:     #f5a623;
+  --purple:   #a78bfa;
+  --teal:     #2dd4bf;
+  --gold:     #fbbf24;
+  --mono:     'JetBrains Mono', monospace;
+  --sans:     'Syne', sans-serif;
+}
+
+html, body { height: 100%; background: var(--bg); color: var(--text1); font-family: var(--mono); overflow: hidden; }
+
+/* ── Layout ── */
+.app { display: grid; grid-template-columns: 320px 1fr 280px; grid-template-rows: 52px 1fr 180px; height: 100vh; gap: 0; }
+.header { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; border-bottom: 1px solid var(--border); background: var(--bg1); }
+.panel-left  { grid-row: 2; border-right: 1px solid var(--border); overflow-y: auto; background: var(--bg1); }
+.panel-center { grid-row: 2; overflow-y: auto; background: var(--bg); }
+.panel-right  { grid-row: 2; border-left: 1px solid var(--border); overflow-y: auto; background: var(--bg1); }
+.panel-bottom { grid-column: 1 / -1; border-top: 1px solid var(--border); background: var(--bg1); overflow-x: auto; overflow-y: hidden; display: flex; align-items: stretch; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ── Header ── */
+.logo { font-family: var(--sans); font-size: 13px; font-weight: 800; letter-spacing: .2em; color: var(--text1); }
+.logo span { color: var(--accent); }
+.header-center { font-size: 10px; color: var(--text3); letter-spacing: .12em; }
+.run-btn {
+  font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .1em;
+  padding: 6px 16px; background: var(--accent); color: #fff; border: none;
+  border-radius: 4px; cursor: pointer; transition: opacity .15s;
+}
+.run-btn:hover { opacity: .85; }
+
+/* ── Panel headers ── */
+.ph { padding: 12px 16px 8px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.ph-label { font-size: 9px; font-weight: 600; letter-spacing: .15em; color: var(--text3); }
+.ph-action { font-size: 9px; color: var(--accent); cursor: pointer; }
+.ph-action:hover { opacity: .7; }
+
+/* ── Section groups ── */
+.section { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.section-label { font-size: 8px; font-weight: 700; letter-spacing: .15em; color: var(--text3); margin-bottom: 10px; text-transform: uppercase; }
+
+/* ── Signal inputs ── */
+.sig-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.sig-name { font-size: 9px; color: var(--text2); width: 80px; flex-shrink: 0; }
+.sig-range { flex: 1; height: 3px; accent-color: var(--accent); cursor: pointer; }
+.sig-val { font-size: 10px; font-weight: 600; color: var(--text1); width: 52px; text-align: right; font-family: var(--mono); }
+.sig-unit { font-size: 8px; color: var(--text3); width: 28px; }
+
+/* ── Presets ── */
+.presets { display: flex; gap: 6px; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+.preset-btn { font-size: 8px; font-weight: 600; letter-spacing: .08em; padding: 4px 8px; border: 1px solid var(--border2); border-radius: 3px; background: transparent; color: var(--text2); cursor: pointer; transition: all .12s; white-space: nowrap; }
+.preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Ticker selector ── */
+.ticker-input { font-family: var(--mono); font-size: 16px; font-weight: 700; background: var(--bg2); border: 1px solid var(--border2); color: var(--text1); padding: 6px 10px; border-radius: 4px; width: 90px; text-transform: uppercase; letter-spacing: .08em; }
+.ticker-input:focus { outline: none; border-color: var(--accent); }
+
+/* ── Center — conviction display ── */
+.conviction-main { padding: 24px 28px; }
+.conv-score-big { font-size: 72px; font-weight: 700; font-family: var(--sans); line-height: 1; letter-spacing: -.03em; transition: all .2s; }
+.conv-score-big.high  { color: var(--gain); }
+.conv-score-big.med   { color: var(--warn); }
+.conv-score-big.low   { color: var(--text2); }
+.conv-action { font-size: 11px; font-weight: 600; letter-spacing: .18em; margin-top: 4px; }
+.action-buy   { color: var(--gain); }
+.action-watch { color: var(--warn); }
+.action-hold  { color: var(--text2); }
+
+.conv-meta { display: flex; gap: 16px; margin-top: 12px; }
+.conv-meta-item { display: flex; flex-direction: column; gap: 2px; }
+.conv-meta-label { font-size: 8px; color: var(--text3); letter-spacing: .1em; }
+.conv-meta-val { font-size: 11px; font-weight: 600; color: var(--text1); }
+
+/* ── Waterfall chart ── */
+.waterfall { padding: 0 28px 20px; }
+.wf-label { font-size: 9px; font-weight: 700; letter-spacing: .12em; color: var(--text3); margin-bottom: 14px; }
+.wf-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.wf-name { font-size: 9px; color: var(--text2); width: 100px; flex-shrink: 0; text-align: right; }
+.wf-bar-wrap { flex: 1; height: 14px; background: var(--bg2); border-radius: 2px; overflow: hidden; position: relative; }
+.wf-bar { height: 100%; border-radius: 2px; transition: width .25s ease; min-width: 2px; }
+.wf-score { font-size: 9px; font-weight: 600; width: 32px; text-align: right; }
+.wf-max { font-size: 8px; color: var(--text3); width: 28px; }
+
+/* ── Survival / coherence ── */
+.physics-block { padding: 16px 28px; border-top: 1px solid var(--border); }
+.physics-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+.physics-key { font-size: 9px; color: var(--text3); }
+.physics-val { font-size: 9px; font-weight: 600; color: var(--text1); font-family: var(--mono); }
+
+/* ── Trap flags ── */
+.traps { padding: 12px 28px; }
+.trap-badge { display: inline-block; font-size: 8px; font-weight: 700; letter-spacing: .08em; padding: 3px 7px; border-radius: 2px; background: rgba(255,77,106,0.15); color: var(--loss); border: 1px solid rgba(255,77,106,0.3); margin: 2px; }
+
+/* ── Right panel — tuning ── */
+.tune-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.tune-name { font-size: 9px; color: var(--text2); width: 120px; flex-shrink: 0; }
+.tune-range { flex: 1; height: 3px; accent-color: var(--purple); cursor: pointer; }
+.tune-val { font-size: 9px; font-weight: 600; color: var(--purple); width: 36px; text-align: right; }
+.reset-btn { font-size: 8px; padding: 2px 6px; border: 1px solid var(--border); border-radius: 3px; background: none; color: var(--text3); cursor: pointer; }
+.reset-btn:hover { color: var(--text1); border-color: var(--border2); }
+
+/* ── Bottom — scenario history ── */
+.scenario-list { display: flex; gap: 1px; align-items: stretch; padding: 0; }
+.scenario-card { width: 160px; flex-shrink: 0; padding: 10px 12px; cursor: pointer; border-right: 1px solid var(--border); transition: background .12s; display: flex; flex-direction: column; justify-content: space-between; }
+.scenario-card:hover { background: var(--bg2); }
+.scenario-card.active { background: var(--bg3); border-top: 2px solid var(--accent); }
+.sc-ticker { font-size: 12px; font-weight: 700; font-family: var(--sans); color: var(--text1); }
+.sc-score { font-size: 20px; font-weight: 700; font-family: var(--sans); }
+.sc-meta { font-size: 8px; color: var(--text3); margin-top: 2px; }
+.sc-delta { font-size: 8px; font-weight: 600; }
+.sc-delta.pos { color: var(--gain); }
+.sc-delta.neg { color: var(--loss); }
+.sc-label { font-size: 8px; font-weight: 600; letter-spacing: .08em; }
+.add-scenario { width: 48px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text3); font-size: 20px; flex-shrink: 0; }
+.add-scenario:hover { color: var(--accent); }
+
+/* ── Bayesian params ── */
+.bayes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+.bayes-item { display: flex; flex-direction: column; gap: 2px; }
+.bayes-item label { font-size: 8px; color: var(--text3); }
+.bayes-item input { font-family: var(--mono); font-size: 9px; background: var(--bg2); border: 1px solid var(--border); color: var(--text1); padding: 3px 5px; border-radius: 2px; width: 100%; }
+.bayes-item input:focus { outline: none; border-color: var(--purple); }
+
+/* ── Mode toggle ── */
+.mode-tabs { display: flex; gap: 1px; background: var(--bg2); border-radius: 4px; padding: 2px; }
+.mode-tab { font-size: 8px; font-weight: 600; letter-spacing: .08em; padding: 4px 10px; border-radius: 3px; cursor: pointer; color: var(--text3); }
+.mode-tab.active { background: var(--bg3); color: var(--text1); }
+
+/* ── Gauge ring ── */
+.gauge-wrap { position: relative; width: 56px; height: 56px; flex-shrink: 0; }
+.gauge-wrap svg { transform: rotate(-90deg); }
+.gauge-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+
+.animate-in { animation: fadeUp .2s ease both; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="logo">CYPHER <span>·</span> SCANNER SANDBOX</div>
+    <div class="header-center">CONVICTION ENGINE SIMULATOR — NO LIVE DATA</div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div class="mode-tabs" id="modeTabs">
+        <div class="mode-tab active" onclick="setMode('single')">SINGLE</div>
+        <div class="mode-tab" onclick="setMode('sweep')">PARAM SWEEP</div>
+        <div class="mode-tab" onclick="setMode('compare')">COMPARE</div>
+      </div>
+      <button class="run-btn" onclick="runAndSave()">RUN + SAVE ▶</button>
+    </div>
+  </header>
+
+  <!-- Left: Signal Inputs -->
+  <div class="panel-left">
+    <div class="ph">
+      <span class="ph-label">SIGNAL INPUTS</span>
+      <span class="ph-action" onclick="randomize()">RANDOMIZE</span>
+    </div>
+
+    <div class="section" style="padding-top:14px;padding-bottom:10px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <input class="ticker-input" id="tickerInput" value="CRDO" maxlength="5" oninput="this.value=this.value.toUpperCase();compute()">
+        <div>
+          <div class="conv-meta-label">SECTOR</div>
+          <select id="sectorSel" onchange="compute()" style="font-family:var(--mono);font-size:9px;background:var(--bg2);border:1px solid var(--border);color:var(--text1);padding:4px 6px;border-radius:3px;margin-top:2px;cursor:pointer;">
+            <option value="SEMICONDUCTORS">Semis</option>
+            <option value="ENERGY_EP">E&amp;P</option>
+            <option value="ENERGY_REFINER">Refiner</option>
+            <option value="BANKS_REGIONAL">Reg. Bank</option>
+            <option value="BANKS_MONEY_CENTER">Money Center</option>
+            <option value="BIOTECH">Biotech</option>
+            <option value="DEFENSE">Defense</option>
+            <option value="AIRLINES">Airlines</option>
+            <option value="INSURANCE">Insurance</option>
+            <option value="CONSUMER_DISCRETIONARY">Consumer</option>
+            <option value="HOMEBUILDERS">Homebuilders</option>
+            <option value="SHIPPING">Shipping</option>
+            <option value="AGRICULTURE">Agriculture</option>
+            <option value="PHARMA">Pharma</option>
+            <option value="">Unknown</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Presets -->
+    <div class="presets">
+      <span style="font-size:8px;color:var(--text3);letter-spacing:.1em;align-self:center;">PRESETS</span>
+      <button class="preset-btn" onclick="loadPreset('strongInsider')">Strong Insider</button>
+      <button class="preset-btn" onclick="loadPreset('volumeBreakout')">Vol Breakout</button>
+      <button class="preset-btn" onclick="loadPreset('biotech')">PDUFA Play</button>
+      <button class="preset-btn" onclick="loadPreset('defense')">Defense Contract</button>
+      <button class="preset-btn" onclick="loadPreset('weakAll')">Weak All</button>
+      <button class="preset-btn" onclick="loadPreset('trapSetup')">Trap Setup</button>
+    </div>
+
+    <!-- Volume -->
+    <div class="section">
+      <div class="section-label">Volume Signals</div>
+      <div class="sig-row">
+        <span class="sig-name">Vol Ratio</span>
+        <input class="sig-range" type="range" id="volRatio" min="0" max="10" step="0.1" value="3.2" oninput="compute()">
+        <span class="sig-val" id="volRatioV">3.2</span><span class="sig-unit">×avg</span>
+      </div>
+      <div class="sig-row">
+        <span class="sig-name">Dollar Vol</span>
+        <input class="sig-range" type="range" id="dollarVol" min="0" max="50" step="0.5" value="12" oninput="compute()">
+        <span class="sig-val" id="dollarVolV">$12M</span><span class="sig-unit">/day</span>
+      </div>
+      <div class="sig-row">
+        <span class="sig-name">Signal Age</span>
+        <input class="sig-range" type="range" id="signalAge" min="0" max="72" step="0.5" value="2" oninput="compute()">
+        <span class="sig-val" id="signalAgeV">2.0</span><span class="sig-unit">hrs</span>
+      </div>
+    </div>
+
+    <!-- Insider -->
+    <div class="section">
+      <div class="section-label">Insider Activity</div>
+      <div class="sig-row">
+        <span class="sig-name">Insider $</span>
+        <input class="sig-range" type="range" id="insiderDollar" min="0" max="5000000" step="10000" value="0" oninput="compute()">
+        <span class="sig-val" id="insiderDollarV">$0</span><span class="sig-unit"></span>
+      </div>
+      <div class="sig-row">
+        <span class="sig-name">Days Since</span>
+        <input class="sig-range" type="range" id="insiderDays" min="0" max="60" step="1" value="0" oninput="compute()">
+        <span class="sig-val" id="insiderDaysV">0</span><span class="sig-unit">days</span>
+      </div>
+    </div>
+
+    <!-- Sentiment -->
+    <div class="section">
+      <div class="section-label">Sentiment &amp; Macro</div>
+      <div class="sig-row">
+        <span class="sig-name">Sentiment</span>
+        <input class="sig-range" type="range" id="sentiment" min="-1" max="1" step="0.05" value="0.4" oninput="compute()">
+        <span class="sig-val" id="sentimentV">+0.40</span><span class="sig-unit"></span>
+      </div>
+      <div class="sig-row">
+        <span class="sig-name">Macro Score</span>
+        <input class="sig-range" type="range" id="macroScore" min="0" max="12" step="0.5" value="6" oninput="compute()">
+        <span class="sig-val" id="macroScoreV">6.0</span><span class="sig-unit">/12</span>
+      </div>
+    </div>
+
+    <!-- Technical -->
+    <div class="section">
+      <div class="section-label">Technical &amp; Options</div>
+      <div class="sig-row">
+        <span class="sig-name">Above 50MA</span>
+        <input class="sig-range" type="range" id="above50ma" min="0" max="1" step="1" value="1" oninput="compute()">
+        <span class="sig-val" id="above50maV">YES</span><span class="sig-unit"></span>
+      </div>
+      <div class="sig-row">
+        <span class="sig-name">Price Chg 5d</span>
+        <input class="sig-range" type="range" id="priceChg5d" min="-15" max="25" step="0.5" value="4.2" oninput="compute()">
+        <span class="sig-val" id="priceChg5dV">+4.2</span><span class="sig-unit">%</span>
+      </div>
+      <div class="sig-row">
+        <span class="sig-name">ATR %</span>
+        <input class="sig-range" type="range" id="atrPct" min="0.5" max="8" step="0.1" value="2.1" oninput="compute()">
+        <span class="sig-val" id="atrPctV">2.1</span><span class="sig-unit">%</span>
+      </div>
+      <div class="sig-row">
+        <span class="sig-name">C/P Ratio</span>
+        <input class="sig-range" type="range" id="cpRatio" min="0" max="5" step="0.1" value="1.8" oninput="compute()">
+        <span class="sig-val" id="cpRatioV">1.8</span><span class="sig-unit"></span>
+      </div>
+      <div class="sig-row">
+        <span class="sig-name">Options Flow</span>
+        <input class="sig-range" type="range" id="optionsFlow" min="0" max="8" step="0.5" value="4" oninput="compute()">
+        <span class="sig-val" id="optionsFlowV">4.0</span><span class="sig-unit">/8</span>
+      </div>
+    </div>
+
+    <!-- Kalman -->
+    <div class="section">
+      <div class="section-label">Kalman Trend State</div>
+      <div class="sig-row">
+        <span class="sig-name">Velocity Z</span>
+        <input class="sig-range" type="range" id="kalmanVZ" min="-3" max="3" step="0.05" value="1.4" oninput="compute()">
+        <span class="sig-val" id="kalmanVZV">+1.40</span><span class="sig-unit">σ</span>
+      </div>
+      <div class="sig-row">
+        <span class="sig-name">Confidence</span>
+        <input class="sig-range" type="range" id="kalmanConf" min="0" max="1" step="0.01" value="0.72" oninput="compute()">
+        <span class="sig-val" id="kalmanConfV">72</span><span class="sig-unit">%</span>
+      </div>
+    </div>
+
+    <!-- Market data -->
+    <div class="section">
+      <div class="section-label">Company Profile</div>
+      <div class="sig-row">
+        <span class="sig-name">Market Cap</span>
+        <input class="sig-range" type="range" id="marketCap" min="50" max="5000" step="50" value="2100" oninput="compute()">
+        <span class="sig-val" id="marketCapV">$2.1B</span><span class="sig-unit"></span>
+      </div>
+      <div class="sig-row">
+        <span class="sig-name">In Portfolio</span>
+        <input class="sig-range" type="range" id="inPortfolio" min="0" max="1" step="1" value="0" oninput="compute()">
+        <span class="sig-val" id="inPortfolioV">NO</span><span class="sig-unit"></span>
+      </div>
+      <div class="sig-row">
+        <span class="sig-name">13F Flow</span>
+        <input class="sig-range" type="range" id="instFlow" min="-15" max="12" step="1" value="0" oninput="compute()">
+        <span class="sig-val" id="instFlowV">0</span><span class="sig-unit">pts</span>
+      </div>
+    </div>
+
+    <!-- Sector intel -->
+    <div class="section" style="padding-bottom:16px;">
+      <div class="section-label">Sector Intelligence</div>
+      <div class="sig-row">
+        <span class="sig-name">Sector Bonus</span>
+        <input class="sig-range" type="range" id="sectorBonus" min="-20" max="30" step="1" value="0" oninput="compute()">
+        <span class="sig-val" id="sectorBonusV">0</span><span class="sig-unit">pts</span>
+      </div>
+      <div class="sig-row">
+        <span class="sig-name">Sector Trap</span>
+        <input class="sig-range" type="range" id="sectorTrap" min="0" max="1" step="1" value="0" oninput="compute()">
+        <span class="sig-val" id="sectorTrapV">NONE</span><span class="sig-unit"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Center: Output -->
+  <div class="panel-center">
+    <div class="conviction-main">
+      <div style="display:flex;align-items:flex-start;gap:24px;">
+        <div>
+          <div class="conv-score-big" id="convScoreBig">—</div>
+          <div class="conv-action" id="convAction">—</div>
+        </div>
+        <div style="margin-top:8px;">
+          <div class="gauge-wrap">
+            <svg width="56" height="56" viewBox="0 0 56 56">
+              <circle cx="28" cy="28" r="22" fill="none" stroke="var(--bg2)" stroke-width="5"/>
+              <circle id="gaugeRing" cx="28" cy="28" r="22" fill="none" stroke="var(--gain)" stroke-width="5"
+                stroke-dasharray="138.2" stroke-dashoffset="138.2" stroke-linecap="round" style="transition:all .3s ease;"/>
+            </svg>
+            <div class="gauge-label" id="gaugeLabel" style="font-size:9px;color:var(--text2);">—</div>
+          </div>
+        </div>
+        <div class="conv-meta" style="margin-top:8px;">
+          <div class="conv-meta-item">
+            <span class="conv-meta-label">TIER</span>
+            <span class="conv-meta-val" id="metaTier">—</span>
+          </div>
+          <div class="conv-meta-item">
+            <span class="conv-meta-label">SETUP</span>
+            <span class="conv-meta-val" id="metaSetup">—</span>
+          </div>
+          <div class="conv-meta-item">
+            <span class="conv-meta-label">SURVIVAL</span>
+            <span class="conv-meta-val" id="metaSurvival">—</span>
+          </div>
+          <div class="conv-meta-item">
+            <span class="conv-meta-label">BAYESIAN P</span>
+            <span class="conv-meta-val" id="metaBayes">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Waterfall -->
+    <div class="waterfall">
+      <div class="wf-label">CONVICTION BREAKDOWN</div>
+      <div id="waterfall"></div>
+    </div>
+
+    <!-- Survival + Coherence -->
+    <div class="physics-block">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <div class="wf-label" style="margin-bottom:8px;">SIGNAL SURVIVAL</div>
+          <div class="physics-row"><span class="physics-key">Setup Type</span><span class="physics-val" id="phSetup">—</span></div>
+          <div class="physics-row"><span class="physics-key">Hazard Rate λ</span><span class="physics-val" id="phLambda">—</span></div>
+          <div class="physics-row"><span class="physics-key">Half-life</span><span class="physics-val" id="phHalflife">—</span></div>
+          <div class="physics-row"><span class="physics-key">Signal Age</span><span class="physics-val" id="phAge">—</span></div>
+          <div class="physics-row"><span class="physics-key">Survival S(t)</span><span class="physics-val" id="phSurvival">—</span></div>
+          <div class="physics-row"><span class="physics-key">Penalty</span><span class="physics-val" id="phPenalty">—</span></div>
+        </div>
+        <div>
+          <div class="wf-label" style="margin-bottom:8px;">ENTROPY ANALYSIS</div>
+          <div class="physics-row"><span class="physics-key">Shannon H</span><span class="physics-val" id="phEntropy">—</span></div>
+          <div class="physics-row"><span class="physics-key">H / H_max</span><span class="physics-val" id="phEntropyRel">—</span></div>
+          <div class="physics-row"><span class="physics-key">Dominant dim</span><span class="physics-val" id="phDominant">—</span></div>
+          <div class="physics-row"><span class="physics-key">Interpretation</span><span class="physics-val" id="phEntropyInterp">—</span></div>
+          <div class="physics-row"><span class="physics-key">Entropy Score</span><span class="physics-val" id="phEntropyScore">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Trap flags -->
+    <div class="traps" id="trapWrap" style="display:none;">
+      <div class="wf-label" style="margin-bottom:6px;">TRAP FLAGS</div>
+      <div id="trapBadges"></div>
+    </div>
+  </div>
+
+  <!-- Right: Parameter Tuning -->
+  <div class="panel-right">
+    <div class="ph">
+      <span class="ph-label">PARAMETER TUNING</span>
+      <button class="reset-btn" onclick="resetParams()">RESET</button>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Score Maxima (Weights)</div>
+      <div class="tune-row">
+        <span class="tune-name">Volume max</span>
+        <input class="tune-range" type="range" id="pmVolume" min="5" max="40" step="1" value="22" oninput="compute()">
+        <span class="tune-val" id="pmVolumeV">22</span>
+      </div>
+      <div class="tune-row">
+        <span class="tune-name">Insider max</span>
+        <input class="tune-range" type="range" id="pmInsider" min="5" max="40" step="1" value="22" oninput="compute()">
+        <span class="tune-val" id="pmInsiderV">22</span>
+      </div>
+      <div class="tune-row">
+        <span class="tune-name">Sentiment max</span>
+        <input class="tune-range" type="range" id="pmSentiment" min="2" max="24" step="1" value="12" oninput="compute()">
+        <span class="tune-val" id="pmSentimentV">12</span>
+      </div>
+      <div class="tune-row">
+        <span class="tune-name">Technical max</span>
+        <input class="tune-range" type="range" id="pmTechnical" min="4" max="28" step="1" value="14" oninput="compute()">
+        <span class="tune-val" id="pmTechnicalV">14</span>
+      </div>
+      <div class="tune-row">
+        <span class="tune-name">Options max</span>
+        <input class="tune-range" type="range" id="pmOptions" min="2" max="20" step="1" value="8" oninput="compute()">
+        <span class="tune-val" id="pmOptionsV">8</span>
+      </div>
+      <div class="tune-row">
+        <span class="tune-name">Macro max</span>
+        <input class="tune-range" type="range" id="pmMacro" min="2" max="24" step="1" value="12" oninput="compute()">
+        <span class="tune-val" id="pmMacroV">12</span>
+      </div>
+      <div class="tune-row">
+        <span class="tune-name">Kalman max</span>
+        <input class="tune-range" type="range" id="pmKalman" min="2" max="20" step="1" value="10" oninput="compute()">
+        <span class="tune-val" id="pmKalmanV">10</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Gate Thresholds</div>
+      <div class="tune-row">
+        <span class="tune-name">Gate (min score)</span>
+        <input class="tune-range" type="range" id="pmGate" min="20" max="75" step="1" value="45" oninput="compute()">
+        <span class="tune-val" id="pmGateV">45</span>
+      </div>
+      <div class="tune-row">
+        <span class="tune-name">High threshold</span>
+        <input class="tune-range" type="range" id="pmHigh" min="40" max="90" step="1" value="65" oninput="compute()">
+        <span class="tune-val" id="pmHighV">65</span>
+      </div>
+      <div class="tune-row">
+        <span class="tune-name">Elite threshold</span>
+        <input class="tune-range" type="range" id="pmElite" min="60" max="99" step="1" value="82" oninput="compute()">
+        <span class="tune-val" id="pmEliteV">82</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Kalman Filter Params</div>
+      <div class="tune-row">
+        <span class="tune-name">Process noise Q</span>
+        <input class="tune-range" type="range" id="pmKFQ" min="0.0001" max="0.01" step="0.0001" value="0.001" oninput="compute()">
+        <span class="tune-val" id="pmKFQV">0.001</span>
+      </div>
+      <div class="tune-row">
+        <span class="tune-name">Obs noise R</span>
+        <input class="tune-range" type="range" id="pmKFR" min="0.05" max="2.0" step="0.05" value="0.25" oninput="compute()">
+        <span class="tune-val" id="pmKFRV">0.25</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Hazard Rate (Signal Decay)</div>
+      <div class="tune-row">
+        <span class="tune-name">Breakout λ</span>
+        <input class="tune-range" type="range" id="pmHzBreakout" min="0.02" max="0.5" step="0.01" value="0.18" oninput="compute()">
+        <span class="tune-val" id="pmHzBreakoutV">0.18</span>
+      </div>
+      <div class="tune-row">
+        <span class="tune-name">Accumulation λ</span>
+        <input class="tune-range" type="range" id="pmHzAccum" min="0.001" max="0.05" step="0.001" value="0.02" oninput="compute()">
+        <span class="tune-val" id="pmHzAccumV">0.020</span>
+      </div>
+      <div class="tune-row">
+        <span class="tune-name">Momentum λ</span>
+        <input class="tune-range" type="range" id="pmHzMom" min="0.02" max="0.3" step="0.01" value="0.08" oninput="compute()">
+        <span class="tune-val" id="pmHzMomV">0.08</span>
+      </div>
+    </div>
+
+    <div class="section" style="padding-bottom:16px;">
+      <div class="section-label">Entropy Thresholds</div>
+      <div class="tune-row">
+        <span class="tune-name">Dominant (H ≤)</span>
+        <input class="tune-range" type="range" id="pmEntDom" min="0.1" max="0.8" step="0.05" value="0.4" oninput="compute()">
+        <span class="tune-val" id="pmEntDomV">0.40</span>
+      </div>
+      <div class="tune-row">
+        <span class="tune-name">Diffuse (H ≥)</span>
+        <input class="tune-range" type="range" id="pmEntDiff" min="1.5" max="2.5" step="0.05" value="2.2" oninput="compute()">
+        <span class="tune-val" id="pmEntDiffV">2.20</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom: Scenario History -->
+  <div class="panel-bottom">
+    <div style="display:flex;align-items:center;padding:0 16px;border-right:1px solid var(--border);flex-shrink:0;">
+      <span style="font-size:8px;font-weight:700;letter-spacing:.15em;color:var(--text3);">HISTORY</span>
+    </div>
+    <div class="scenario-list" id="scenarioList"></div>
+    <div class="add-scenario" onclick="runAndSave()">＋</div>
+  </div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// CYPHER SCANNER SANDBOX — Conviction Engine (standalone port)
+// All math extracted from 07_scanner.js, no live API calls.
+// ══════════════════════════════════════════════════════════════
+
+// ── Conviction engine ─────────────────────────────────────────
+
+const PARAMS = {
+  SCORE_MAX_VOLUME:     22,
+  SCORE_MAX_INSIDER:    22,
+  SCORE_MAX_SENTIMENT:  12,
+  SCORE_MAX_TECHNICAL:  14,
+  SCORE_MAX_OPTIONS:     8,
+  SCORE_MAX_MACRO:      12,
+  SCORE_MAX_KALMAN:     10,
+  CONVICTION_GATE:      45,
+  CONVICTION_HIGH:      65,
+  CONVICTION_ELITE:     82,
+  KF_Q:                0.001,
+  KF_R:                0.25,
+  HZ_BREAKOUT:         0.18,
+  HZ_ACCUM:            0.02,
+  HZ_MOM:              0.08,
+  ENT_DOMINANT:        0.40,
+  ENT_DIFFUSE:         2.20,
+};
+
+const HAZARD_RATES = {
+  BREAKOUT: () => PARAMS.HZ_BREAKOUT,
+  ACCUMULATION: () => PARAMS.HZ_ACCUM,
+  MOMENTUM_CONTINUATION: () => PARAMS.HZ_MOM,
+  OVERSOLD_BOUNCE: () => 0.15,
+  OPTIONS_SWEEP: () => 0.30,
+  CATALYST: () => 0.10,
+  UNKNOWN: () => 0.10,
+};
+
+const BAYES_PARAMS = {
+  volume:    { yes: [0.75, 0.20], no: [0.25, 0.25] },
+  insider:   { yes: [0.80, 0.18], no: [0.15, 0.20] },
+  sentiment: { yes: [0.60, 0.25], no: [0.30, 0.28] },
+  technical: { yes: [0.65, 0.22], no: [0.35, 0.28] },
+  options:   { yes: [0.75, 0.20], no: [0.20, 0.22] },
+  macro:     { yes: [0.58, 0.25], no: [0.40, 0.28] },
+  kalman:    { yes: [0.70, 0.22], no: [0.30, 0.25] },
+};
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function _scoreVolume(volRatio, dollarVol) {
+  let score = 0;
+  if (volRatio > 8) score += 22;
+  else if (volRatio > 5) score += 17;
+  else if (volRatio > 3) score += 12;
+  else if (volRatio > 2) score += 7;
+  else if (volRatio > 1.5) score += 3;
+  // dollar vol liquidity boost
+  if (dollarVol > 10) score += 2;
+  else if (dollarVol < 2) score -= 3;
+  return clamp(score, 0, PARAMS.SCORE_MAX_VOLUME);
+}
+
+function _scoreInsider(insiderDollar, insiderDays) {
+  if (insiderDollar <= 0) return 0;
+  let score = 0;
+  if (insiderDollar >= 2000000) score += 22;
+  else if (insiderDollar >= 500000) score += 17;
+  else if (insiderDollar >= 100000) score += 12;
+  else if (insiderDollar >= 25000) score += 7;
+  else score += 3;
+  // recency discount (days since filing)
+  if (insiderDays > 45) score -= 6;
+  else if (insiderDays > 21) score -= 3;
+  return clamp(score, 0, PARAMS.SCORE_MAX_INSIDER);
+}
+
+function _scoreSentiment(sentScore) {
+  // sentScore ∈ [-1, 1]
+  let score = 0;
+  if (sentScore > 0.7) score = 12;
+  else if (sentScore > 0.4) score = 9;
+  else if (sentScore > 0.1) score = 5;
+  else if (sentScore > -0.1) score = 2;
+  else if (sentScore < -0.4) score = -2;
+  return clamp(score, 0, PARAMS.SCORE_MAX_SENTIMENT);
+}
+
+function _scoreTechnical(above50ma, priceChg5d, atrPct) {
+  let score = 0;
+  if (above50ma) { score += 5; }
+  if (priceChg5d > 8) score += 9;
+  else if (priceChg5d > 4) score += 6;
+  else if (priceChg5d > 1) score += 3;
+  else if (priceChg5d < -5) score -= 3;
+  // ATR: higher ATR = more opportunity
+  if (atrPct > 4) score += 2;
+  else if (atrPct < 1) score -= 1;
+  return clamp(score, 0, PARAMS.SCORE_MAX_TECHNICAL);
+}
+
+function _scoreOptions(cpRatio, optionsFlow) {
+  let score = 0;
+  score += clamp(optionsFlow, 0, 8); // direct score
+  if (cpRatio > 2) score += 2;  // bullish call skew
+  else if (cpRatio < 0.8) score -= 2;
+  return clamp(score, 0, PARAMS.SCORE_MAX_OPTIONS);
+}
+
+function _classifySetup(volRatio, insiderDollar, above50ma, priceChg5d, cpRatio) {
+  if (insiderDollar >= 100000 && priceChg5d < 5) return 'ACCUMULATION';
+  if (volRatio > 3 && priceChg5d > 3 && above50ma) return 'BREAKOUT';
+  if (cpRatio > 2 && optionsFlow() > 4) return 'OPTIONS_SWEEP';
+  if (priceChg5d > 6 && volRatio > 2) return 'MOMENTUM_CONTINUATION';
+  if (priceChg5d < -5 && volRatio > 2) return 'OVERSOLD_BOUNCE';
+  return 'UNKNOWN';
+}
+
+function optionsFlow() { return parseFloat(document.getElementById('optionsFlow').value); }
+
+function _scoreKalman(velocityZ, confidence) {
+  let score = 0;
+  if (velocityZ > 2.5) score = 10;
+  else if (velocityZ > 2.0) score = 8;
+  else if (velocityZ > 1.5) score = 6;
+  else if (velocityZ > 1.0) score = 5;
+  else if (velocityZ > 0.5) score = 3;
+  else if (velocityZ > 0.0) score = 2;
+  else if (velocityZ < -2.0) score = -6;
+  else if (velocityZ < -1.5) score = -4;
+  else if (velocityZ < -1.0) score = -2;
+  if (score !== 0) {
+    if (confidence > 0.75) score = Math.round(score * 1.30);
+    else if (confidence < 0.45) score = Math.round(score * 0.50);
+  }
+  return clamp(score, -6, PARAMS.SCORE_MAX_KALMAN);
+}
+
+function _signalEntropy(rawVolume, rawInsider, rawSentiment, rawTechnical, rawOptions, rawKalman) {
+  const D = 6;
+  const H_MAX = Math.log2(D);
+  const fracs = [
+    Math.max(0, rawVolume) / PARAMS.SCORE_MAX_VOLUME,
+    Math.max(0, rawInsider) / PARAMS.SCORE_MAX_INSIDER,
+    Math.max(0, rawSentiment) / PARAMS.SCORE_MAX_SENTIMENT,
+    Math.max(0, rawTechnical) / PARAMS.SCORE_MAX_TECHNICAL,
+    Math.max(0, rawOptions) / PARAMS.SCORE_MAX_OPTIONS,
+    Math.max(0, rawKalman) / PARAMS.SCORE_MAX_KALMAN,
+  ];
+  const total = fracs.reduce((a,b) => a+b, 0);
+  if (total <= 0) return { H: H_MAX, probs: fracs, interp: 'no_signal', dominant: null };
+  const probs = fracs.map(v => v / total);
+  let H = 0;
+  for (const p of probs) if (p > 0) H -= p * Math.log2(p);
+
+  const names = ['VOLUME','INSIDER','SENTIMENT','TECHNICAL','OPTIONS','KALMAN'];
+  const maxIdx = probs.indexOf(Math.max(...probs));
+
+  let interp;
+  if (H <= PARAMS.ENT_DOMINANT) interp = 'DOMINANT';
+  else if (H <= 1.3) interp = 'CONCENTRATED';
+  else if (H <= 1.8) interp = 'MIXED';
+  else if (H <= PARAMS.ENT_DIFFUSE) interp = 'DIFFUSE';
+  else interp = 'MAX DIFFUSION';
+
+  return { H, probs, interp, dominant: names[maxIdx], H_MAX };
+}
+
+function _scoreEntropy(H) {
+  if (H <= PARAMS.ENT_DOMINANT) return 10;
+  if (H <= 0.8) return 7;
+  if (H <= 1.3) return 4;
+  if (H <= 1.8) return 1;
+  if (H <= PARAMS.ENT_DIFFUSE) return -2;
+  return -6;
+}
+
+function _gaussianLogPDF(x, mu, sigma) {
+  const z = (x - mu) / sigma;
+  return -0.5 * z * z - Math.log(sigma);
+}
+
+function _computeBayesian(rawVol, rawIns, rawSent, rawTech, rawOpts, rawMacro, rawKalman) {
+  const fracs = {
+    volume:    clamp(rawVol / PARAMS.SCORE_MAX_VOLUME, 0, 1),
+    insider:   clamp(rawIns / PARAMS.SCORE_MAX_INSIDER, 0, 1),
+    sentiment: clamp(rawSent / PARAMS.SCORE_MAX_SENTIMENT, 0, 1),
+    technical: clamp(rawTech / PARAMS.SCORE_MAX_TECHNICAL, 0, 1),
+    options:   clamp(rawOpts / PARAMS.SCORE_MAX_OPTIONS, 0, 1),
+    macro:     clamp(rawMacro / PARAMS.SCORE_MAX_MACRO, 0, 1),
+    kalman:    clamp(rawKalman / PARAMS.SCORE_MAX_KALMAN, 0, 1),
+  };
+  let logOdds = 0;
+  for (const [dim, frac] of Object.entries(fracs)) {
+    const p = BAYES_PARAMS[dim]; if (!p) continue;
+    logOdds += _gaussianLogPDF(frac, p.yes[0], p.yes[1]) - _gaussianLogPDF(frac, p.no[0], p.no[1]);
+  }
+  const posterior = 1 / (1 + Math.exp(-logOdds));
+  let bonus = 0;
+  if (posterior > 0.80) bonus = 8;
+  else if (posterior > 0.65) bonus = 4;
+  else if (posterior < 0.30) bonus = -6;
+  else if (posterior < 0.45) bonus = -3;
+  return { posterior, bonus };
+}
+
+function _computeSurvival(ageHours, setupType) {
+  const lambdaFn = HAZARD_RATES[setupType] || HAZARD_RATES.UNKNOWN;
+  const lambda = lambdaFn();
+  const survival = Math.exp(-lambda * Math.max(0, ageHours));
+  const halfLife = Math.LN2 / lambda;
+  return { survival, halfLife, lambda, isStale: survival < 0.30 };
+}
+
+function _survivalPenalty(survival, ageHours, rawVol, rawOpts) {
+  const baseRaw = Math.max(0, rawVol + rawOpts);
+  const base = -Math.min(20, Math.round(baseRaw * (1 - survival) * 0.35));
+  const volFresh = Math.exp(-0.40 * ageHours);
+  const optFresh = Math.exp(-0.35 * ageHours);
+  const volP = rawVol > 0 ? -Math.round(rawVol * (1 - volFresh) * 0.5) : 0;
+  const optP = rawOpts > 0 ? -Math.round(rawOpts * (1 - optFresh) * 0.5) : 0;
+  return Math.max(-25, base + volP + optP);
+}
+
+// ── Traps ──────────────────────────────────────────────────────
+function _computeTraps(volRatio, priceChg5d, insiderDollar, cpRatio, inPortfolio, sectorTrap, marketCap, dollarVol) {
+  const flags = [];
+  if (inPortfolio) flags.push('IN_PORTFOLIO');
+  if (sectorTrap) flags.push('SECTOR_FLAG');
+  if (dollarVol < 0.5) flags.push('HIGH_LIQ_RISK');
+  else if (dollarVol < 2) flags.push('MODERATE_LIQ_RISK');
+  if (volRatio > 5 && priceChg5d > 12) flags.push('POSSIBLE_PUMP');
+  if (cpRatio < 0.5 && volRatio > 3) flags.push('BEARISH_OPTIONS');
+  if (priceChg5d > 20) flags.push('EXTENDED_MOVE');
+  return flags;
+}
+
+// ── Main compute ───────────────────────────────────────────────
+function computeConviction() {
+  syncParams();
+
+  // Read inputs
+  const volRatio     = +document.getElementById('volRatio').value;
+  const dollarVol    = +document.getElementById('dollarVol').value;
+  const signalAge    = +document.getElementById('signalAge').value;
+  const insiderDollar= +document.getElementById('insiderDollar').value;
+  const insiderDays  = +document.getElementById('insiderDays').value;
+  const sentScore    = +document.getElementById('sentiment').value;
+  const macroScoreRaw= +document.getElementById('macroScore').value;
+  const above50ma    = +document.getElementById('above50ma').value === 1;
+  const priceChg5d   = +document.getElementById('priceChg5d').value;
+  const atrPct       = +document.getElementById('atrPct').value;
+  const cpRatio      = +document.getElementById('cpRatio').value;
+  const optFlow      = +document.getElementById('optionsFlow').value;
+  const kalmanVZ     = +document.getElementById('kalmanVZ').value;
+  const kalmanConf   = +document.getElementById('kalmanConf').value;
+  const marketCap    = +document.getElementById('marketCap').value;
+  const inPortfolio  = +document.getElementById('inPortfolio').value === 1;
+  const instFlow     = +document.getElementById('instFlow').value;
+  const sectorBonus  = +document.getElementById('sectorBonus').value;
+  const sectorTrap   = +document.getElementById('sectorTrap').value === 1;
+
+  // Raw scores
+  const rawVolume    = _scoreVolume(volRatio, dollarVol);
+  const rawInsider   = _scoreInsider(insiderDollar, insiderDays);
+  const rawSentiment = _scoreSentiment(sentScore);
+  const rawTechnical = _scoreTechnical(above50ma, priceChg5d, atrPct);
+  const rawOptions   = _scoreOptions(cpRatio, optFlow);
+  const rawKalman    = _scoreKalman(kalmanVZ, kalmanConf);
+
+  // Entropy
+  const entropy = _signalEntropy(rawVolume, rawInsider, rawSentiment, rawTechnical, rawOptions, rawKalman);
+  const entropyScore = _scoreEntropy(entropy.H);
+
+  // Convergence: count how many dims are above 50% of their max
+  const dims = [rawVolume/PARAMS.SCORE_MAX_VOLUME, rawInsider/PARAMS.SCORE_MAX_INSIDER,
+                rawSentiment/PARAMS.SCORE_MAX_SENTIMENT, rawTechnical/PARAMS.SCORE_MAX_TECHNICAL,
+                rawOptions/PARAMS.SCORE_MAX_OPTIONS, rawKalman/PARAMS.SCORE_MAX_KALMAN];
+  const above50count = dims.filter(d => d > 0.5).length;
+  const convergenceScore = above50count >= 4 ? 10 : above50count >= 3 ? 7 : above50count >= 2 ? 4 : above50count >= 1 ? 1 : 0;
+
+  // Bayesian
+  const bayes = _computeBayesian(rawVolume, rawInsider, rawSentiment, rawTechnical, rawOptions, macroScoreRaw, rawKalman);
+
+  // Setup type
+  const setupType = _classifySetup(volRatio, insiderDollar, above50ma, priceChg5d, cpRatio);
+
+  // Survival
+  const surv = _computeSurvival(signalAge, setupType);
+  const survPenalty = _survivalPenalty(surv.survival, signalAge, rawVolume, rawOptions);
+
+  // Liquidity penalty
+  const liqPenalty = dollarVol < 0.5 ? -20 : dollarVol < 2 ? -10 : dollarVol < 10 ? -4 : 0;
+
+  // Base total
+  const baseTotal = Math.max(0, rawVolume + rawInsider + rawSentiment + macroScoreRaw + convergenceScore + rawTechnical + rawOptions + rawKalman + entropyScore);
+  let total = Math.min(100, Math.max(0, baseTotal + bayes.bonus + survPenalty + liqPenalty + instFlow + sectorBonus));
+
+  // Traps
+  const trapFlags = _computeTraps(volRatio, priceChg5d, insiderDollar, cpRatio, inPortfolio, sectorTrap, marketCap, dollarVol);
+  const hasTrap = trapFlags.length > 0;
+
+  // Action
+  let action;
+  if (inPortfolio) action = 'HOLD';
+  else if (hasTrap && trapFlags.some(f => ['SECTOR_FLAG','HIGH_LIQ_RISK'].includes(f))) action = 'WATCH';
+  else if (total < PARAMS.CONVICTION_GATE) action = 'BELOW GATE';
+  else if (total >= PARAMS.CONVICTION_HIGH) action = 'BUY';
+  else action = 'WATCH';
+
+  // Tier
+  const tier = total >= PARAMS.CONVICTION_ELITE ? 'ELITE' : total >= PARAMS.CONVICTION_HIGH ? 'HIGH' : total >= PARAMS.CONVICTION_GATE ? 'MEDIUM' : 'BELOW GATE';
+
+  return {
+    total: Math.round(total),
+    action, tier, setupType, trapFlags,
+    breakdown: {
+      volume:      rawVolume,
+      insider:     rawInsider,
+      sentiment:   rawSentiment,
+      technical:   rawTechnical,
+      options:     rawOptions,
+      macro:       macroScoreRaw,
+      convergence: convergenceScore,
+      kalman:      rawKalman,
+      entropy:     entropyScore,
+      bayes:       bayes.bonus,
+      survPenalty, liqPenalty, instFlow, sectorBonus,
+    },
+    entropy, bayes, surv, survPenalty,
+    rawKalman, kalmanVZ, kalmanConf,
+    signalAge,
+  };
+}
+
+// ── Sync param sliders display ──────────────────────────────────
+function syncParams() {
+  PARAMS.SCORE_MAX_VOLUME    = +document.getElementById('pmVolume').value;
+  PARAMS.SCORE_MAX_INSIDER   = +document.getElementById('pmInsider').value;
+  PARAMS.SCORE_MAX_SENTIMENT = +document.getElementById('pmSentiment').value;
+  PARAMS.SCORE_MAX_TECHNICAL = +document.getElementById('pmTechnical').value;
+  PARAMS.SCORE_MAX_OPTIONS   = +document.getElementById('pmOptions').value;
+  PARAMS.SCORE_MAX_MACRO     = +document.getElementById('pmMacro').value;
+  PARAMS.SCORE_MAX_KALMAN    = +document.getElementById('pmKalman').value;
+  PARAMS.CONVICTION_GATE     = +document.getElementById('pmGate').value;
+  PARAMS.CONVICTION_HIGH     = +document.getElementById('pmHigh').value;
+  PARAMS.CONVICTION_ELITE    = +document.getElementById('pmElite').value;
+  PARAMS.HZ_BREAKOUT         = +document.getElementById('pmHzBreakout').value;
+  PARAMS.HZ_ACCUM            = +document.getElementById('pmHzAccum').value;
+  PARAMS.HZ_MOM              = +document.getElementById('pmHzMom').value;
+  PARAMS.ENT_DOMINANT        = +document.getElementById('pmEntDom').value;
+  PARAMS.ENT_DIFFUSE         = +document.getElementById('pmEntDiff').value;
+
+  // Update display values
+  const kv = (id, v) => { const el = document.getElementById(id+'V'); if (el) el.textContent = v; };
+  kv('pmVolume', PARAMS.SCORE_MAX_VOLUME);
+  kv('pmInsider', PARAMS.SCORE_MAX_INSIDER);
+  kv('pmSentiment', PARAMS.SCORE_MAX_SENTIMENT);
+  kv('pmTechnical', PARAMS.SCORE_MAX_TECHNICAL);
+  kv('pmOptions', PARAMS.SCORE_MAX_OPTIONS);
+  kv('pmMacro', PARAMS.SCORE_MAX_MACRO);
+  kv('pmKalman', PARAMS.SCORE_MAX_KALMAN);
+  kv('pmGate', PARAMS.CONVICTION_GATE);
+  kv('pmHigh', PARAMS.CONVICTION_HIGH);
+  kv('pmElite', PARAMS.CONVICTION_ELITE);
+  kv('pmHzBreakout', PARAMS.HZ_BREAKOUT.toFixed(2));
+  kv('pmHzAccum', PARAMS.HZ_ACCUM.toFixed(3));
+  kv('pmHzMom', PARAMS.HZ_MOM.toFixed(2));
+  kv('pmEntDom', PARAMS.ENT_DOMINANT.toFixed(2));
+  kv('pmEntDiff', PARAMS.ENT_DIFFUSE.toFixed(2));
+}
+
+// ── Input label sync ────────────────────────────────────────────
+function syncInputLabels() {
+  const fmt = (id, fn) => {
+    const el = document.getElementById(id);
+    const vEl = document.getElementById(id+'V');
+    if (!el || !vEl) return;
+    vEl.textContent = fn(parseFloat(el.value));
+  };
+  fmt('volRatio',      v => v.toFixed(1));
+  fmt('dollarVol',     v => '$' + v.toFixed(0) + 'M');
+  fmt('signalAge',     v => v.toFixed(1));
+  fmt('insiderDollar', v => v >= 1000000 ? '$' + (v/1000000).toFixed(1)+'M' : v >= 1000 ? '$'+(v/1000).toFixed(0)+'K' : '$'+v.toFixed(0));
+  fmt('insiderDays',   v => v.toFixed(0));
+  fmt('sentiment',     v => (v >= 0 ? '+' : '') + v.toFixed(2));
+  fmt('macroScore',    v => v.toFixed(1));
+  fmt('above50ma',     v => v ? 'YES' : 'NO');
+  fmt('priceChg5d',    v => (v >= 0 ? '+' : '') + v.toFixed(1));
+  fmt('atrPct',        v => v.toFixed(1));
+  fmt('cpRatio',       v => v.toFixed(1));
+  fmt('optionsFlow',   v => v.toFixed(1));
+  fmt('kalmanVZ',      v => (v >= 0 ? '+' : '') + v.toFixed(2));
+  fmt('kalmanConf',    v => (v*100).toFixed(0));
+  fmt('marketCap',     v => v >= 1000 ? '$'+(v/1000).toFixed(1)+'B' : '$'+v.toFixed(0)+'M');
+  fmt('inPortfolio',   v => v ? 'YES' : 'NO');
+  fmt('instFlow',      v => (v >= 0 ? '+' : '') + v.toFixed(0));
+  fmt('sectorBonus',   v => (v >= 0 ? '+' : '') + v.toFixed(0));
+  fmt('sectorTrap',    v => v ? 'FLAGGED' : 'NONE');
+}
+
+// ── Render output ───────────────────────────────────────────────
+const DIM_COLORS = {
+  volume:      '#3d7fff',
+  insider:     '#fbbf24',
+  sentiment:   '#a78bfa',
+  technical:   '#2dd4bf',
+  options:     '#f97316',
+  macro:       '#60a5fa',
+  convergence: '#34d399',
+  kalman:      '#e879f9',
+  entropy:     '#fb923c',
+  bayes:       '#4ade80',
+  survPenalty: '#ff4d6a',
+  liqPenalty:  '#ef4444',
+  instFlow:    '#22d3ee',
+  sectorBonus: '#a3e635',
+};
+
+const DIM_MAX = {
+  volume: 22, insider: 22, sentiment: 12, technical: 14,
+  options: 8, macro: 12, convergence: 10, kalman: 10,
+  entropy: 10, bayes: 8, survPenalty: 0, liqPenalty: 0,
+  instFlow: 12, sectorBonus: 30,
+};
+
+function renderOutput(result) {
+  const { total, action, tier, setupType, trapFlags, breakdown, entropy, bayes, surv, survPenalty, rawKalman, kalmanVZ, kalmanConf, signalAge } = result;
+
+  // Score
+  const scoreEl = document.getElementById('convScoreBig');
+  scoreEl.textContent = total;
+  scoreEl.className = 'conv-score-big ' + (total >= 65 ? 'high' : total >= 45 ? 'med' : 'low');
+
+  // Action
+  const actionEl = document.getElementById('convAction');
+  actionEl.textContent = action;
+  actionEl.className = 'conv-action ' + (action === 'BUY' ? 'action-buy' : action === 'WATCH' ? 'action-watch' : 'action-hold');
+
+  // Gauge
+  const pct = total / 100;
+  const circ = 138.2;
+  document.getElementById('gaugeRing').style.strokeDashoffset = circ * (1 - pct);
+  document.getElementById('gaugeRing').style.stroke = total >= 65 ? 'var(--gain)' : total >= 45 ? 'var(--warn)' : 'var(--text3)';
+  document.getElementById('gaugeLabel').textContent = tier;
+
+  // Meta
+  document.getElementById('metaTier').textContent = tier;
+  document.getElementById('metaSetup').textContent = setupType;
+  document.getElementById('metaSurvival').textContent = (surv.survival * 100).toFixed(0) + '%';
+  document.getElementById('metaBayes').textContent = (bayes.posterior * 100).toFixed(0) + '%';
+
+  // Waterfall
+  const wf = document.getElementById('waterfall');
+  wf.innerHTML = '';
+  const allDims = [
+    ['Volume', breakdown.volume, PARAMS.SCORE_MAX_VOLUME],
+    ['Insider', breakdown.insider, PARAMS.SCORE_MAX_INSIDER],
+    ['Sentiment', breakdown.sentiment, PARAMS.SCORE_MAX_SENTIMENT],
+    ['Technical', breakdown.technical, PARAMS.SCORE_MAX_TECHNICAL],
+    ['Options', breakdown.options, PARAMS.SCORE_MAX_OPTIONS],
+    ['Macro', breakdown.macro, PARAMS.SCORE_MAX_MACRO],
+    ['Convergence', breakdown.convergence, 10],
+    ['Kalman', breakdown.kalman, PARAMS.SCORE_MAX_KALMAN],
+    ['Entropy', breakdown.entropy, 10],
+    ['Bayesian', breakdown.bayes, 8],
+    ['Survival', breakdown.survPenalty, 0],
+    ['Liquidity', breakdown.liqPenalty, 0],
+    ['Inst. Flow', breakdown.instFlow, 12],
+    ['Sector', breakdown.sectorBonus, 30],
+  ];
+
+  for (const [name, score, max] of allDims) {
+    const isNeg = score < 0;
+    const absScore = Math.abs(score);
+    const barPct = max > 0 ? (absScore / max) * 100 : Math.min(100, absScore * 5);
+    const color = isNeg ? '#ff4d6a' : DIM_COLORS[name.toLowerCase().replace(/[^a-z]/g,'').replace('inst','instFlow').replace('flow','')] || 'var(--accent)';
+    const scoreColor = isNeg ? '#ff4d6a' : score > 0 ? '#f0f4ff' : 'var(--text3)';
+    const row = document.createElement('div');
+    row.className = 'wf-row';
+    row.innerHTML = `
+      <span class="wf-name">${name}</span>
+      <div class="wf-bar-wrap">
+        <div class="wf-bar" style="width:${barPct}%;background:${color};opacity:${score === 0 ? 0.2 : 1}"></div>
+      </div>
+      <span class="wf-score" style="color:${scoreColor}">${score > 0 ? '+' : ''}${score}</span>
+      <span class="wf-max">${max > 0 ? '/' + max : ''}</span>`;
+    wf.appendChild(row);
+  }
+
+  // Survival
+  document.getElementById('phSetup').textContent = setupType;
+  document.getElementById('phLambda').textContent = surv.lambda.toFixed(3);
+  document.getElementById('phHalflife').textContent = surv.halfLife.toFixed(1) + ' hrs';
+  document.getElementById('phAge').textContent = signalAge.toFixed(1) + ' hrs';
+  document.getElementById('phSurvival').textContent = (surv.survival * 100).toFixed(1) + '%' + (surv.isStale ? ' ⚠ STALE' : '');
+  document.getElementById('phSurvival').style.color = surv.isStale ? 'var(--loss)' : 'var(--text1)';
+  document.getElementById('phPenalty').textContent = survPenalty;
+  document.getElementById('phPenalty').style.color = survPenalty < 0 ? 'var(--loss)' : 'var(--text3)';
+
+  // Entropy
+  document.getElementById('phEntropy').textContent = entropy.H.toFixed(4) + ' bits';
+  document.getElementById('phEntropyRel').textContent = (entropy.H / entropy.H_MAX * 100).toFixed(0) + '% of max';
+  document.getElementById('phDominant').textContent = entropy.dominant || '—';
+  document.getElementById('phEntropyInterp').textContent = entropy.interp;
+  document.getElementById('phEntropyScore').textContent = (breakdown.entropy > 0 ? '+' : '') + breakdown.entropy;
+  document.getElementById('phEntropyScore').style.color = breakdown.entropy < 0 ? 'var(--loss)' : breakdown.entropy > 4 ? 'var(--gain)' : 'var(--text1)';
+
+  // Traps
+  const trapWrap = document.getElementById('trapWrap');
+  const trapBadges = document.getElementById('trapBadges');
+  trapBadges.innerHTML = '';
+  if (trapFlags.length > 0) {
+    trapWrap.style.display = 'block';
+    trapFlags.forEach(f => {
+      const b = document.createElement('span');
+      b.className = 'trap-badge';
+      b.textContent = f.replace(/_/g, ' ');
+      trapBadges.appendChild(b);
+    });
+  } else {
+    trapWrap.style.display = 'none';
+  }
+}
+
+// ── Scenarios ───────────────────────────────────────────────────
+let scenarios = [];
+let activeScenarioIdx = -1;
+
+function runAndSave() {
+  syncInputLabels();
+  const result = computeConviction();
+  renderOutput(result);
+
+  const ticker = document.getElementById('tickerInput').value || '???';
+  const prev = scenarios.length > 0 ? scenarios[scenarios.length - 1].result.total : null;
+  const delta = prev !== null ? result.total - prev : null;
+
+  scenarios.push({ ticker, result, params: {...PARAMS}, ts: Date.now(), delta });
+  activeScenarioIdx = scenarios.length - 1;
+  renderScenarios();
+}
+
+function renderScenarios() {
+  const list = document.getElementById('scenarioList');
+  list.innerHTML = '';
+  scenarios.forEach((sc, i) => {
+    const el = document.createElement('div');
+    el.className = 'scenario-card' + (i === activeScenarioIdx ? ' active' : '');
+    const scoreColor = sc.result.total >= 65 ? 'var(--gain)' : sc.result.total >= 45 ? 'var(--warn)' : 'var(--text3)';
+    const deltaHtml = sc.delta !== null ? `<span class="sc-delta ${sc.delta >= 0 ? 'pos' : 'neg'}">${sc.delta >= 0 ? '+' : ''}${sc.delta}</span>` : '';
+    el.innerHTML = `
+      <div>
+        <span class="sc-ticker">${sc.ticker}</span>
+        <div class="sc-meta">${new Date(sc.ts).toLocaleTimeString()}</div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span class="sc-score" style="color:${scoreColor}">${sc.result.total}</span>
+        <div style="text-align:right">
+          ${deltaHtml}
+          <div class="sc-label" style="color:${scoreColor}">${sc.result.action}</div>
+        </div>
+      </div>`;
+    el.onclick = () => loadScenario(i);
+    list.appendChild(el);
+  });
+  list.scrollLeft = list.scrollWidth;
+}
+
+function loadScenario(i) {
+  activeScenarioIdx = i;
+  renderScenarios();
+  const sc = scenarios[i];
+  // Restore params
+  Object.assign(PARAMS, sc.params);
+  // Update param sliders
+  document.getElementById('pmVolume').value = PARAMS.SCORE_MAX_VOLUME;
+  document.getElementById('pmInsider').value = PARAMS.SCORE_MAX_INSIDER;
+  document.getElementById('pmGate').value = PARAMS.CONVICTION_GATE;
+  document.getElementById('pmHigh').value = PARAMS.CONVICTION_HIGH;
+  document.getElementById('pmElite').value = PARAMS.CONVICTION_ELITE;
+  syncParams();
+  renderOutput(sc.result);
+}
+
+// ── Presets ─────────────────────────────────────────────────────
+const PRESETS = {
+  strongInsider: {
+    volRatio:0.8, dollarVol:4, signalAge:18, insiderDollar:800000,
+    insiderDays:3, sentiment:0.2, macroScore:6, above50ma:1,
+    priceChg5d:1.5, atrPct:2.5, cpRatio:1.2, optionsFlow:3,
+    kalmanVZ:0.4, kalmanConf:0.6, marketCap:800, inPortfolio:0,
+    instFlow:0, sectorBonus:0, sectorTrap:0,
+  },
+  volumeBreakout: {
+    volRatio:6.2, dollarVol:22, signalAge:1.5, insiderDollar:0,
+    insiderDays:0, sentiment:0.6, macroScore:8, above50ma:1,
+    priceChg5d:7.5, atrPct:3.2, cpRatio:2.1, optionsFlow:6,
+    kalmanVZ:2.2, kalmanConf:0.82, marketCap:2100, inPortfolio:0,
+    instFlow:6, sectorBonus:12, sectorTrap:0,
+  },
+  biotech: {
+    volRatio:3.8, dollarVol:8, signalAge:6, insiderDollar:420000,
+    insiderDays:18, sentiment:0.5, macroScore:4, above50ma:1,
+    priceChg5d:4.2, atrPct:5.5, cpRatio:1.5, optionsFlow:5,
+    kalmanVZ:1.2, kalmanConf:0.7, marketCap:1200, inPortfolio:0,
+    instFlow:4, sectorBonus:25, sectorTrap:0,
+  },
+  defense: {
+    volRatio:2.9, dollarVol:15, signalAge:8, insiderDollar:0,
+    insiderDays:0, sentiment:0.3, macroScore:7, above50ma:1,
+    priceChg5d:2.8, atrPct:1.8, cpRatio:1.3, optionsFlow:4,
+    kalmanVZ:0.9, kalmanConf:0.76, marketCap:45000, inPortfolio:0,
+    instFlow:6, sectorBonus:20, sectorTrap:0,
+  },
+  weakAll: {
+    volRatio:1.2, dollarVol:2, signalAge:36, insiderDollar:0,
+    insiderDays:0, sentiment:0.05, macroScore:3, above50ma:0,
+    priceChg5d:-1.2, atrPct:1.5, cpRatio:1.0, optionsFlow:1,
+    kalmanVZ:-0.3, kalmanConf:0.4, marketCap:600, inPortfolio:0,
+    instFlow:-4, sectorBonus:0, sectorTrap:0,
+  },
+  trapSetup: {
+    volRatio:7.2, dollarVol:0.3, signalAge:2, insiderDollar:0,
+    insiderDays:0, sentiment:0.7, macroScore:6, above50ma:1,
+    priceChg5d:18, atrPct:6, cpRatio:0.4, optionsFlow:5,
+    kalmanVZ:2.8, kalmanConf:0.85, marketCap:95, inPortfolio:0,
+    instFlow:-8, sectorBonus:0, sectorTrap:1,
+  },
+};
+
+function loadPreset(name) {
+  const p = PRESETS[name]; if (!p) return;
+  for (const [k, v] of Object.entries(p)) {
+    const el = document.getElementById(k);
+    if (el) el.value = v;
+  }
+  compute();
+}
+
+// ── Randomize ───────────────────────────────────────────────────
+function randomize() {
+  const r = (lo, hi, step) => Math.round((lo + Math.random() * (hi - lo)) / step) * step;
+  document.getElementById('volRatio').value = r(0.5, 8, 0.1);
+  document.getElementById('dollarVol').value = r(0.5, 30, 0.5);
+  document.getElementById('signalAge').value = r(0, 48, 0.5);
+  document.getElementById('insiderDollar').value = Math.random() > 0.6 ? r(0, 2000000, 10000) : 0;
+  document.getElementById('insiderDays').value = r(0, 45, 1);
+  document.getElementById('sentiment').value = r(-0.8, 0.9, 0.05);
+  document.getElementById('macroScore').value = r(0, 12, 0.5);
+  document.getElementById('above50ma').value = Math.random() > 0.35 ? 1 : 0;
+  document.getElementById('priceChg5d').value = r(-10, 20, 0.5);
+  document.getElementById('atrPct').value = r(0.5, 6, 0.1);
+  document.getElementById('cpRatio').value = r(0.3, 4, 0.1);
+  document.getElementById('optionsFlow').value = r(0, 8, 0.5);
+  document.getElementById('kalmanVZ').value = r(-2.5, 2.8, 0.05);
+  document.getElementById('kalmanConf').value = r(0.2, 0.95, 0.01);
+  document.getElementById('instFlow').value = r(-15, 12, 1);
+  document.getElementById('sectorBonus').value = r(-15, 28, 1);
+  document.getElementById('sectorTrap').value = Math.random() > 0.85 ? 1 : 0;
+  compute();
+}
+
+// ── Reset params ────────────────────────────────────────────────
+const DEFAULT_PARAMS = {
+  pmVolume:22, pmInsider:22, pmSentiment:12, pmTechnical:14, pmOptions:8,
+  pmMacro:12, pmKalman:10, pmGate:45, pmHigh:65, pmElite:82,
+  pmHzBreakout:0.18, pmHzAccum:0.02, pmHzMom:0.08, pmEntDom:0.40, pmEntDiff:2.20,
+};
+
+function resetParams() {
+  for (const [k, v] of Object.entries(DEFAULT_PARAMS)) {
+    const el = document.getElementById(k);
+    if (el) el.value = v;
+  }
+  compute();
+}
+
+// ── Mode ─────────────────────────────────────────────────────────
+function setMode(m) {
+  document.querySelectorAll('.mode-tab').forEach((t,i) => {
+    t.classList.toggle('active', ['single','sweep','compare'][i] === m);
+  });
+}
+
+// ── Main compute loop ──────────────────────────────────────────
+function compute() {
+  syncInputLabels();
+  syncParams();
+  const result = computeConviction();
+  renderOutput(result);
+}
+
+// ── Init ──────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  compute();
+  // Auto-save first scenario
+  setTimeout(() => runAndSave(), 100);
+});
+</script>
+</body>
+</html>
